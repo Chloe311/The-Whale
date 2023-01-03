@@ -1,0 +1,272 @@
+let bg, bs;
+let numLayers = 50; //increase to improve quality (change speed too)
+let layers = [numLayers];
+let fsize = 25;
+let speed = 0.03; //20 layers = .12 speed
+let bx, by;
+let x2=0, y2=0, r2, dy2, dx2, tailr2;
+let pi = 3.145;
+let a, b;
+let c = [];
+let count = 0;
+let wastes = [];
+let head;
+let wasteImg = [];
+let video;
+let poseNet;
+let poses = [];
+let px=0,py=0;
+let font;
+function preload() {
+  bg = loadImage("bg.png");
+  for (let i = 0; i < 9; i++) {
+    wasteImg[i] = loadImage(i + 1 + ".png");
+  }
+  font = loadFont("Roboto-Bold.ttf");
+}
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  video = createCapture(VIDEO);
+  video.size(width, height);
+  // Create a new poseNet method with a single detection
+  poseNet = ml5.poseNet(video);
+  // This sets up an event that fills the global variable "poses"
+  // with an array every time new poses are detected
+  poseNet.on("pose", function (results) {
+    poses = results;
+  });
+  px=width/5;
+  py=height/5;
+  x2=width/5;
+  y2=height/5;
+  poseNet.flipHorizontal=true;
+
+  // Hide the video element, and just show the canvas
+  video.hide();
+
+  background("#17C0CE");
+  head = createVector(-100, -100);
+
+  c = [
+    "#1f306e",
+    "#553772",
+    "#8f3b76",
+    "#c7417b",
+    "#f5487f",
+    "#4b3772",
+    "#352750",
+    "#d3bdff",
+  ];
+  for (let i = 0; i < 8; i++) {
+    wastes[i] = new Waste(wasteImg[i]);
+  }
+  for (let i = numLayers - 1; i >= 0; i = i - 1) {
+    layers[i] = new Layer(i);
+    mouseX = width / 2;
+    mouseY = height / 2;
+  }
+  head = createVector(layers[48].X, layers[48].Y);
+
+  // noCursor();
+}
+
+function draw() {
+  if(count>=8){
+    background(0);
+    end();
+  }else{
+  image(bg, 0, 0, width, height);
+  for (let i = 0; i < poses.length; i++) {
+    // For each pose detected, loop through all the keypoints
+    let pose = poses[i].pose;
+    for (let j = 0; j < pose.keypoints.length; j++) {
+      // A keypoint is an object describing a body part (like rightArm or leftShoulder)
+      let keypoint = pose.keypoints[j];
+      // Only draw an ellipse is the pose probability is bigger than 0.2
+      if (
+        keypoint.score > 0.35 &&frameCount % 2 == 0 &&
+        (keypoint.part == "leftWrist" || keypoint.part == "rightWrist")
+      ) {
+        fill(255, 0, 0);
+        noStroke();
+        px=keypoint.position.x;
+        py=keypoint.position.y;
+        // ellipse(px, py, 10, 10);//展示手位置
+      }
+    }
+  }
+  strokeWeight(0);
+  x2 = px;
+  y2 = py;
+ 
+  for (let i = layers.length - 1; i >= 0; i = i - 1) {
+    layers[i].update();
+  }
+  for (let i = 0; i < layers.length; i++) {
+    layers[i].swim();
+  }
+  head = createVector(layers[48].X, layers[48].Y);
+  for (let i = 0; i < wastes.length; i++) {
+    wastes[i].update();
+    wastes[i].display();
+    if (wastes[i].exist == false) {
+      wastes.splice(i, 1);
+    }
+  }
+  }
+  
+}
+function end(){
+  textFont(font);
+  textAlign(CENTER);
+  textSize(25);
+  text("Ocean pollution is widespread, worsening, and poses\n a clear and present danger to human health and wellbeing.\nPlastic waste is the most visible component of ocean pollution.\n More than ten million tonnes of plastic enter the seas every year.\n The majority of this breaks down into microplastic\n particles and accumulates in coastal and deep-sea sediments.",width/2,0.1*height);
+  push()
+  imageMode(CENTER)
+  image(wasteImg[8],width/2,height*0.65,width*0.7,height*0.6);
+  pop();
+}
+class Layer {
+  constructor(i) {
+    (this.X = 0), (this.Y = 0), this.R == 0;
+    this.L = 1 - i / numLayers;
+    this.R =
+      ((30 * pow(this.L, 3) - 58.5 * sq(this.L) + 28 * this.L + 0.92) * fsize) /
+      2;
+    this.dY = (10 * pow(this.L, 3) - 11 * sq(this.L)) * fsize;
+    this.gray = 220 - 100 * this.L;
+    if (i == numLayers - 1) this.first = 1;
+    if (this.L > 0.775) {
+      this.dX = (22 * sq(this.L) - 30 * this.L + 10) * fsize;
+      if (i == 0) {
+        this.tailR = 0;
+        this.R = 0;
+      } else {
+        this.tailR = ((-86.7 * sq(this.L) + 153.2 * this.L - 66) * fsize) / 2;
+      }
+    }
+    this.R2 = r2;
+    this.dY2 = dy2;
+    this.dX2 = dx2;
+    this.tailR2 = tailr2;
+    r2 = this.R;
+    dy2 = this.dY;
+    dx2 = this.dX;
+    tailr2 = this.tailR;
+  }
+
+  update() {
+    this.BX = bx;
+    this.BY = by;
+    bx = this.X;
+
+    by = this.Y;
+    if (this.first == 1) {
+      this.X = (speed * x2 + this.X) / (speed + 1);
+      this.Y = (speed * y2 + this.Y) / (speed + 1);
+    } else {
+      this.X = this.BX;
+      this.Y = this.BY;
+    }
+    this.X2 = x2;
+    this.Y2 = y2;
+    x2 = this.X;
+    y2 = this.Y;
+  }
+
+  swim() {
+    fill(c[count % 8]);
+    stroke(this.gray);
+    strokeWeight(0);
+    if (this.L <= 0.775) {
+      ellipse(this.X, this.Y - this.dY, this.R * 2, this.R * 2); //body
+      if ((this.L > 0.3) & (this.L <= 0.4)) {
+        rotate(pi / 4);
+        a = this.X - this.R;
+        b = this.Y + this.R * 0.4;
+        ellipse(
+          sqrt(sq(a) + sq(b)) * sin(pi / 4 + atan(a / b)),
+          sqrt(sq(a) + sq(b)) * cos(pi / 4 + atan(a / b)),
+          fsize * (this.L - 0.3) * 15,
+          fsize * (this.L - 0.3) * 40
+        ); //left fin
+        a = this.X + this.R;
+        ellipse(
+          sqrt(sq(a) + sq(b)) * sin(pi / 4 + atan(a / b)),
+          sqrt(sq(a) + sq(b)) * cos(pi / 4 + atan(a / b)),
+          fsize * (this.L - 0.3) * 40,
+          fsize * (this.L - 0.3) * 15
+        ); //right fin
+        rotate(-pi / 4);
+      }
+
+      fill(this.gray + 25);
+      //strokeWeight(0);
+      stroke(this.gray + 25);
+      beginShape(); //belly
+      if (this.first != 1) {
+        vertex(
+          this.X2 + cos(pi / 6) * this.R2,
+          this.Y2 - this.dY2 + sin(pi / 6) * this.R2
+        );
+      }
+      for (let i = pi / 6; i <= (5 * pi) / 6; i = i + pi / 15) {
+        vertex(this.X + cos(i) * this.R, this.Y - this.dY + sin(i) * this.R);
+      }
+      vertex(
+        this.X + cos((5 * pi) / 6) * this.R,
+        this.Y - this.dY + sin((5 * pi) / 6) * this.R
+      );
+      if (this.first != 1) {
+        vertex(
+          this.X2 + cos((5 * pi) / 6) * this.R2,
+          this.Y2 - this.dY2 + sin((5 * pi) / 6) * this.R2
+        );
+      }
+      vertex(this.X, this.Y - this.dY + this.R / 3);
+      endShape(CLOSE);
+    } else {
+      for (let i = 1; i >= -1; i = i - 2) {
+        beginShape();
+        vertex(this.X + i * this.dX, this.Y - this.dY + this.R);
+        vertex(this.X2 + i * this.dX2, this.Y2 - this.dY2 + this.R2);
+        vertex(this.X2 + i * this.dX2, this.Y2 - this.dY2 - this.R2);
+        vertex(this.X + i * this.dX, this.Y - this.dY - this.R);
+        endShape(CLOSE);
+        beginShape();
+        vertex(this.X + i * this.dX, this.Y - this.dY + this.R);
+        vertex(this.X + i * this.dX - this.tailR, this.Y - this.dY);
+        vertex(this.X + i * this.dX, this.Y - this.dY - this.R);
+        vertex(this.X + i * this.dX + this.tailR, this.Y - this.dY);
+        endShape(CLOSE);
+        beginShape();
+        vertex(this.X + i * this.dX - this.tailR, this.Y - this.dY);
+        vertex(this.X2 + i * this.dX2 - this.tailR2, this.Y2 - this.dY2);
+        vertex(this.X2 + i * this.dX2 + this.tailR2, this.Y2 - this.dY2);
+        vertex(this.X + i * this.dX + this.tailR, this.Y - this.dY);
+        endShape(CLOSE);
+      }
+    }
+  }
+}
+class Waste {
+  constructor(img) {
+    this.pos = createVector(random(0.15*width,0.85*width), random(0.15*height,0.85*height));
+    this.img = img;
+    this.exist = true;
+  }
+  update() {
+    this.pos.x += random(-1, 1);
+    this.pos.y += random(-1, 1);
+    if (head.dist(this.pos) < 30) {
+      count += 1;
+      this.exist = false;
+    }
+  }
+  display() {
+    push();
+    imageMode(CENTER);
+    image(this.img, this.pos.x, this.pos.y, 200, 200);
+    pop();
+  }
+}
